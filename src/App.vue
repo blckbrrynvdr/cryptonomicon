@@ -28,10 +28,8 @@
       <section>
         <div class="flex">
           <div class="max-w-xs">
-            <label
-              for="wallet"
-              class="block text-sm font-medium text-gray-700"
-              >{{ ticker }}</label
+            <label for="wallet" class="block text-sm font-medium text-gray-700"
+              >Тикер {{ ticker }}</label
             >
             <div class="mt-1 relative rounded-md shadow-md">
               <input
