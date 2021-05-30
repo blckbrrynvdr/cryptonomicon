@@ -1,9 +1,10 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
-    <!-- <div -->
-    <!-- class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
-    > -->
-    <!-- <svg
+    <div
+      v-if="showPreloader"
+      class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
+    >
+      <svg
         class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
@@ -22,8 +23,8 @@
           fill="currentColor"
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         ></path>
-      </svg> -->
-    <!-- </div> -->
+      </svg>
+    </div>
     <div class="container">
       <section>
         <div class="flex">
@@ -35,6 +36,7 @@
               <input
                 v-model="ticker"
                 @keydown.enter="add"
+                @input="searchCoins"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -43,30 +45,24 @@
               />
             </div>
             <div
+              v-if="searchHints.length > 0"
               class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
             >
               <span
+                v-for="(searchHint, ndx) of searchHints"
+                :key="ndx"
+                @click="addByTooltip"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
-                BTC
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                DOGE
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                BCH
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                CHD
+                {{ searchHint.name }}
               </span>
             </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div
+              class="text-sm text-red-600"
+              v-if="Object.keys(searchError).length"
+            >
+              Такой тикер уже добавлен
+            </div>
           </div>
         </div>
         <button
@@ -187,11 +183,42 @@ export default {
       ticker: "",
       tickers: [],
       sel: null,
-      graph: []
+      graph: [],
+      coinsList: [],
+      searchHints: [],
+      searchError: {},
+      showPreloader: true
     };
+  },
+  mounted: function() {
+    this.getCoinsList();
   },
 
   methods: {
+    // получение списка монет
+    async getCoinsList() {
+      const localCoins = JSON.parse(localStorage.getItem("coinsList"));
+
+      if (localCoins) {
+        this.coinsList = localCoins;
+      } else {
+        const f = await fetch(
+          `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
+        );
+        const data = await f.json();
+
+        const dataArr = Object.entries(data.Data).map(([name, value]) => {
+          return {
+            name,
+            value
+          };
+        });
+
+        this.coinsList = dataArr;
+        localStorage.setItem("coinsList", JSON.stringify(dataArr));
+      }
+      this.showPreloader = false;
+    },
     // добавление тикера
     add() {
       // объявляем переменную нового тикера
@@ -202,7 +229,7 @@ export default {
       };
       // в массив тикеров пушим новый тикер
       this.tickers.push(currentTicker);
-      console.log(currentTicker.name);
+
       setInterval(async () => {
         const f = await fetch(
           `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=481c89e4e191dbcb0a10653d3146e9fd33795b04530f742a14497e7a9afccb70`
@@ -216,6 +243,7 @@ export default {
           this.graph.push(data.USD);
         }
       }, 5000);
+
       // и потом очищаем строку ввода
       this.ticker = "";
     },
@@ -235,6 +263,17 @@ export default {
       return this.graph.map(
         price => 5 + ((price - minValue) * 95) / (maxValue - minValue)
       );
+    },
+
+    searchCoins() {
+      this.searchHints = [];
+      const searchedCoins = this.coinsList.filter(element => {
+        if (this.searchHints.length < 4) {
+          return element.name.toUpperCase().indexOf(this.ticker.toUpperCase()) !== -1;
+        }
+      });
+      this.searchHints = searchedCoins.splice(0, 4);
+      console.log(searchedCoins);
     }
   }
 };
