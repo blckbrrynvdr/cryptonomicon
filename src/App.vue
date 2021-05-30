@@ -51,7 +51,7 @@
               <span
                 v-for="(searchHint, ndx) of searchHints"
                 :key="ndx"
-                @click="addByTooltip"
+                @click="addByTooltip(searchHint.name)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
                 {{ searchHint.name }}
@@ -61,7 +61,7 @@
               class="text-sm text-red-600"
               v-if="Object.keys(searchError).length"
             >
-              Такой тикер уже добавлен
+              {{ searchError.text }}
             </div>
           </div>
         </div>
@@ -195,30 +195,6 @@ export default {
   },
 
   methods: {
-    // получение списка монет
-    async getCoinsList() {
-      const localCoins = JSON.parse(localStorage.getItem("coinsList"));
-
-      if (localCoins) {
-        this.coinsList = localCoins;
-      } else {
-        const f = await fetch(
-          `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
-        );
-        const data = await f.json();
-
-        const dataArr = Object.entries(data.Data).map(([name, value]) => {
-          return {
-            name,
-            value
-          };
-        });
-
-        this.coinsList = dataArr;
-        localStorage.setItem("coinsList", JSON.stringify(dataArr));
-      }
-      this.showPreloader = false;
-    },
     // добавление тикера
     add() {
       // объявляем переменную нового тикера
@@ -227,6 +203,23 @@ export default {
         name: this.ticker,
         price: "-"
       };
+
+      // мои проверочки
+      if (!this.isTickerExists(currentTicker.name)) {
+        this.searchError = {
+          status: "error",
+          text: " Такой тикер не поддерживается "
+        };
+        return false;
+      }
+      if (this.isTickerAdded(currentTicker)) {
+        this.searchError = {
+          status: "error",
+          text: " Такой тикер уже добавлен "
+        };
+        return false;
+      }
+
       // в массив тикеров пушим новый тикер
       this.tickers.push(currentTicker);
 
@@ -265,15 +258,65 @@ export default {
       );
     },
 
+    // получение списка монет
+    async getCoinsList() {
+      const localCoins = JSON.parse(localStorage.getItem("coinsList"));
+
+      if (localCoins) {
+        this.coinsList = localCoins;
+      } else {
+        const f = await fetch(
+          `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
+        );
+        const data = await f.json();
+
+        const dataArr = Object.entries(data.Data).map(([name, value]) => {
+          return {
+            name,
+            value
+          };
+        });
+
+        this.coinsList = dataArr;
+        localStorage.setItem("coinsList", JSON.stringify(dataArr));
+      }
+      this.showPreloader = false;
+    },
+
     searchCoins() {
+      this.searchError = {};
       this.searchHints = [];
       const searchedCoins = this.coinsList.filter(element => {
         if (this.searchHints.length < 4) {
-          return element.name.toUpperCase().indexOf(this.ticker.toUpperCase()) !== -1;
+          return (
+            element.name.toUpperCase().indexOf(this.ticker.toUpperCase()) !== -1
+          );
         }
       });
       this.searchHints = searchedCoins.splice(0, 4);
-      console.log(searchedCoins);
+    },
+
+    isTickerAdded(ticker) {
+      let addedTickers = [];
+      addedTickers = this.tickers.find(element => element.name === ticker.name);
+      if (addedTickers === undefined) {
+        return false;
+      }
+      if (addedTickers) {
+        return true;
+      }
+    },
+
+    isTickerExists(tickerName) {
+      let findedTickers = this.coinsList.filter(
+        element => element.name.toUpperCase() === tickerName.toUpperCase()
+      );
+      return findedTickers.length;
+    },
+
+    addByTooltip(tickerToAdd) {
+      this.ticker = tickerToAdd;
+      this.add();
     }
   }
 };
