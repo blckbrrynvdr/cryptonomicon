@@ -193,8 +193,35 @@ export default {
   mounted: function() {
     this.getCoinsList();
   },
+  created() {
+    const tickersData = localStorage.getItem("cryptonomicon-list");
+    if (tickersData) {
+      this.tickers = JSON.parse(tickersData);
+      this.tickers.forEach(ticker => {
+        this.subscribeToUpdates(ticker.name);
+      });
+    }
+  },
 
   methods: {
+    subscribeToUpdates(tickerName) {
+      setInterval(async () => {
+        const f = await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=481c89e4e191dbcb0a10653d3146e9fd33795b04530f742a14497e7a9afccb70`
+        );
+        const data = await f.json();
+        // из-за особенностей VUE3 тут реактивность перестаёт работать, приходится костылять
+        this.tickers.find(t => t.name === tickerName).price =
+          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+
+        if (this.sel?.name === tickerName) {
+          this.graph.push(data.USD);
+        }
+      }, 5000);
+
+      // и потом очищаем строку ввода
+      this.ticker = "";
+    },
     // добавление тикера
     add() {
       // объявляем переменную нового тикера
@@ -223,22 +250,9 @@ export default {
       // в массив тикеров пушим новый тикер
       this.tickers.push(currentTicker);
 
-      setInterval(async () => {
-        const f = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=481c89e4e191dbcb0a10653d3146e9fd33795b04530f742a14497e7a9afccb70`
-        );
-        const data = await f.json();
-        // из-за особенностей VUE3 тут реактивность перестаёт работать, приходится костылять
-        this.tickers.find(t => t.name === currentTicker.name).price =
-          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+      localStorage.setItem("cryptonomicon-list", JSON.stringify(this.tickers));
 
-        if (this.sel?.name === currentTicker.name) {
-          this.graph.push(data.USD);
-        }
-      }, 5000);
-
-      // и потом очищаем строку ввода
-      this.ticker = "";
+      this.subscribeToUpdates(currentTicker.name);
     },
 
     select(ticker) {
@@ -248,6 +262,7 @@ export default {
 
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter(t => t !== tickerToRemove);
+      localStorage.setItem("cryptonomicon-list", JSON.stringify(this.tickers));
     },
 
     normalizeGraph() {
@@ -293,7 +308,17 @@ export default {
           );
         }
       });
-      this.searchHints = searchedCoins.splice(0, 4);
+      const sortByNames = (a, b) => {
+        if (a.name > b.name) {
+          return 1;
+        }
+        if (a.name < b.name) {
+          return -1;
+        }
+        return 0;
+      };
+      console.log(searchedCoins.sort(sortByNames));
+      this.searchHints = searchedCoins.sort(sortByNames).splice(0, 4);
     },
 
     isTickerAdded(ticker) {
